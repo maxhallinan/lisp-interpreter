@@ -57,7 +57,7 @@ parens = between (symbol "(") (symbol ")")
 atom :: Parser LispVal
 atom = do
   first <- Char.letterChar <|> Char.symbolChar
-  rest <- Mega.many Char.letterChar
+  rest <- Mega.many (Char.letterChar <|> Char.digitChar <|> Char.symbolChar)
   let atom = first : rest
   return $ Atom atom
 
