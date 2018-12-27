@@ -26,6 +26,7 @@ library:
   source-dirs: src
   dependencies:
   - megaparsec
+  - parser-combinators
 
 executables:
   build-you-a-scheme-exe:
