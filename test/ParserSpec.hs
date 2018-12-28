@@ -30,8 +30,21 @@ main = hspec $ do
         parse "\"1abc\"" `shouldBe` Right (Parser.String "1abc")
         parse "\"ab1c\"" `shouldBe` Right (Parser.String "ab1c")
 
-      it "parses a string with escaped quotes" $ do
-        parse "\"a\\\"b\\\"c\"" `shouldBe` Right (Parser.String "a\"b\"c")
+      describe "escaped characters" $ do
+        it "parses a string with escaped quotes" $ do
+          parse "\"a\\\"b\\\"c\"" `shouldBe` Right (Parser.String "a\"b\"c")
+
+        it "parses a string with an escape character" $ do
+          parse "\"a\\\\b\"" `shouldBe` Right (Parser.String "a\\b")
+
+        it "parses a string with a newline character" $ do
+          parse "\"a\nb\"" `shouldBe` Right (Parser.String "a\nb")
+
+        it "parses a string with a return character" $ do
+          parse "\"a\rb\"" `shouldBe` Right (Parser.String "a\rb")
+
+        it "parses a string with a tab character" $ do
+          parse "\"a\rb\"" `shouldBe` Right (Parser.String "a\rb")
 
     describe "atom" $ do
       it "parses an atom" $ do

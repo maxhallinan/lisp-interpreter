@@ -29,12 +29,7 @@ lispSyntax :: Parser LispVal
 lispSyntax = between space Mega.eof lispVal
 
 lispVal :: Parser LispVal
-lispVal = lexeme $
-      bool
-  <|> atom
-  <|> number
-  <|> string
-  <|> list
+lispVal = lexeme $ bool <|> atom <|> number <|> string <|> list
 
 space :: Parser ()
 space = Lex.space Char.space1 lineComment blockComment
@@ -54,11 +49,31 @@ symbol = Lex.symbol space
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
-escaped :: Parser Char -> Parser Char
-escaped x = Char.char '\\' >> x
+escaped :: Char -> Parser Char
+escaped x = Char.char '\\' >> Char.char x
 
-escapedQuote :: Parser Char
-escapedQuote = escaped (Char.char '"')
+quoteChar :: Parser Char
+quoteChar = escaped '"'
+
+newlineChar :: Parser Char
+newlineChar = escaped 'n' >> return '\n'
+
+escapeChar :: Parser Char
+escapeChar = escaped '\\'
+
+returnChar :: Parser Char
+returnChar = escaped 'r' >> return '\r'
+
+tabChar :: Parser Char
+tabChar = escaped 't' >> return '\t'
+
+escapedChar :: Parser Char
+escapedChar = 
+      Mega.try quoteChar 
+  <|> Mega.try newlineChar 
+  <|> Mega.try escapeChar 
+  <|> Mega.try returnChar 
+  <|> Mega.try tabChar
 
 atom :: Parser LispVal
 atom = do
@@ -84,7 +99,7 @@ number = do
 string :: Parser LispVal
 string = do
   Char.char '"'
-  stringValue <- Mega.many (escapedQuote <|> Char.noneOf "\"")
+  stringValue <- Mega.many (escapedChar <|> Char.noneOf "\"")
   Char.char '"'
   return $ String stringValue
 
