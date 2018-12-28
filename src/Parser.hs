@@ -30,10 +30,10 @@ lispSyntax = between space Mega.eof lispVal
 
 lispVal :: Parser LispVal
 lispVal = lexeme $
-      bool 
-  <|> atom 
-  <|> number 
-  <|> string 
+      bool
+  <|> atom
+  <|> number
+  <|> string
   <|> list
 
 space :: Parser ()
@@ -53,6 +53,12 @@ symbol = Lex.symbol space
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
+
+escaped :: Parser Char -> Parser Char
+escaped x = Char.char '\\' >> x
+
+escapedQuote :: Parser Char
+escapedQuote = escaped (Char.char '"')
 
 atom :: Parser LispVal
 atom = do
@@ -78,12 +84,12 @@ number = do
 string :: Parser LispVal
 string = do
   Char.char '"'
-  stringValue <- Mega.many (Char.noneOf "\"")
+  stringValue <- Mega.many (escapedQuote <|> Char.noneOf "\"")
   Char.char '"'
   return $ String stringValue
 
 list :: Parser LispVal
-list = do 
+list = do
   symbol "("
   x <- Mega.try improperList <|> properList
   symbol ")"

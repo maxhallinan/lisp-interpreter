@@ -30,6 +30,9 @@ main = hspec $ do
         parse "\"1abc\"" `shouldBe` Right (Parser.String "1abc")
         parse "\"ab1c\"" `shouldBe` Right (Parser.String "ab1c")
 
+      it "parses a string with escaped quotes" $ do
+        parse "\"a\\\"b\\\"c\"" `shouldBe` Right (Parser.String "a\"b\"c")
+
     describe "atom" $ do
       it "parses an atom" $ do
         parse "a" `shouldBe` Right (Parser.Atom "a")
