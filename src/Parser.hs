@@ -35,11 +35,6 @@ instance Show LispVal where
 showLispList :: [LispVal] -> String
 showLispList = unwords . map show
 
-readExpr :: String -> LispVal
-readExpr input = case Parser.parse "" input of
-  Left err -> String $ "Error: " ++ show err
-  Right lispVal -> lispVal
-
 parse :: String -> String -> Either ParseError LispVal
 parse filename input = Mega.parse lispSyntax filename input
 

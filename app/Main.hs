@@ -6,4 +6,4 @@ import qualified Parser as Parser
 import qualified Eval as Eval
 
 main :: IO ()
-main = Env.getArgs >>= print . show . Eval.eval . Parser.readExpr . head
+main = Env.getArgs >>= print . show . Eval.eval . Eval.readExpr . head
