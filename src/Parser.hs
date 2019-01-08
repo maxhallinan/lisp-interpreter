@@ -96,7 +96,7 @@ escapedChar =
 atom :: Parser LispVal
 atom = do
   first <- Char.letterChar <|> Char.symbolChar
-  rest <- Mega.many (Char.letterChar <|> Char.digitChar <|> Char.symbolChar)
+  rest <- Mega.many (Char.noneOf ") ") 
   let atom = first : rest
   return $ Atom atom
 

@@ -51,6 +51,12 @@ main = hspec $ do
         parse "a" `shouldBe` Right (Parser.Atom "a")
         parse "abc" `shouldBe` Right (Parser.Atom "abc")
 
+      it "parses an atom ending with a special character" $ do
+        parse "a?" `shouldBe` Right (Parser.Atom "a?")
+
+      it "does not parse a parens at the end of an atom" $ do
+        parse "(a)" `shouldBe` Right (Parser.ProperList [Parser.Atom "a"])
+
     describe "list" $ do
       describe "proper list" $ do
         it "parses with spaces" $ do
