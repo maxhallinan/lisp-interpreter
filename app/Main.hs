@@ -2,8 +2,8 @@ module Main where
 import qualified System.Environment as Env
 
 import Lib
+import qualified Parser as Parser
+import qualified Eval as Eval
 
 main :: IO ()
-main = do
-  args <- Env.getArgs
-  putStrLn ("Hello" ++ args !! 0)
+main = Env.getArgs >>= print . show . Eval.eval . Parser.readExpr . head

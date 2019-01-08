@@ -1,8 +1,8 @@
 module Parser where
 
-import Data.List as List
 import Control.Applicative ((<|>), empty)
 import Control.Monad.Combinators (between)
+import qualified Data.List as List
 import qualified Text.Megaparsec.Char as Char
 import qualified Text.Megaparsec.Char.Lexer as Lex
 import qualified Text.Megaparsec.Expr as Expr
@@ -33,7 +33,12 @@ instance Show LispVal where
   show (ImproperList l x) = "(" ++ (showLispList l) ++ show x ++ ")"
 
 showLispList :: [LispVal] -> String
-showLispList = List.intercalate " " . fmap show
+showLispList = unwords . map show
+
+readExpr :: String -> LispVal
+readExpr input = case Parser.parse "" input of
+  Left err -> String $ "Error: " ++ show err
+  Right lispVal -> lispVal
 
 parse :: String -> String -> Either ParseError LispVal
 parse filename input = Mega.parse lispSyntax filename input
