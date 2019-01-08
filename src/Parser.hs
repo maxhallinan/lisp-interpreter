@@ -35,11 +35,6 @@ instance Show LispVal where
 showLispList :: [LispVal] -> String
 showLispList = unwords . map show
 
-readExpr :: String -> LispVal
-readExpr input = case Parser.parse "" input of
-  Left err -> String $ "Error: " ++ show err
-  Right lispVal -> lispVal
-
 parse :: String -> String -> Either ParseError LispVal
 parse filename input = Mega.parse lispSyntax filename input
 
@@ -93,12 +88,20 @@ escapedChar =
   <|> Mega.try returnChar 
   <|> Mega.try tabChar
 
+foo :: Parser Char
+foo = Char.symbolChar
+
 atom :: Parser LispVal
 atom = do
-  first <- Char.letterChar <|> Char.symbolChar
-  rest <- Mega.many (Char.noneOf ") ") 
-  let atom = first : rest
+  atom <- identifier <|> Char.string "+"  <|> Char.string "-" <|> Char.string "..."
   return $ Atom atom
+  where 
+    identifier = do 
+      first <- initial 
+      rest  <- Mega.many subsequent
+      return $ first : rest
+    initial     = Char.letterChar <|> Char.oneOf "!$%&*/:<=>?~_^"
+    subsequent  = initial <|> Char.digitChar <|> Char.oneOf ".+-"
 
 bool :: Parser LispVal
 bool = do

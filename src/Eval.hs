@@ -1,19 +1,58 @@
 module Eval where
 
+import Data.Traversable (mapM)
+import Control.Monad.Except (catchError, throwError)
 import qualified Parser as Parser
 
-eval :: Parser.LispVal -> Parser.LispVal
-eval val@(Parser.Atom _)   = val
-eval val@(Parser.String _) = val
-eval val@(Parser.Number _) = val
-eval val@(Parser.Bool _)   = val
-eval (Parser.ProperList [Parser.Atom "quote", val]) = val
-eval (Parser.ProperList (Parser.Atom f : args)) = apply f $ map eval args
+data LispError 
+  = NumArgs Integer [Parser.LispVal]
+  | TypeMismatch String Parser.LispVal
+  | ParseError Parser.ParseError
+  | BadSpecialForm String Parser.LispVal
+  | NotFunction String String
+  | UnboundVar String String
+  | Default String
+  deriving Eq
 
-apply :: String -> [Parser.LispVal] -> Parser.LispVal
-apply f args = maybe (Parser.Bool False) ($ args) $ lookup f primitives
+instance Show LispError where
+  show (NumArgs expected found) = "Expected " ++ show expected ++ " arguments but found " ++ (unwords $ map show found)
+  show (TypeMismatch expected found) = "Invalid type: expected " ++ expected ++ " but found this value: " ++ (show found)
+  show (ParseError err) = "Parse error: " ++ show err
+  show (BadSpecialForm message lispVal) = message ++ ": " ++ (show lispVal)
+  show (NotFunction message lispVal) = message ++ ": " ++ (show lispVal)
+  show (UnboundVar message varName) = message ++ ": " ++ varName
+  show (Default message) = message
 
-primitives :: [(String, [Parser.LispVal] -> Parser.LispVal)]
+type ThrowsError = Either LispError
+
+trapError action = catchError action (return . show)
+
+extractValue :: ThrowsError a -> a
+extractValue (Right val) = val
+
+readExpr :: String -> String -> ThrowsError Parser.LispVal
+readExpr filename input = 
+  case Parser.parse filename input of
+    Left err      -> throwError $ ParseError err
+    Right lispVal -> return lispVal
+
+eval :: Parser.LispVal -> ThrowsError Parser.LispVal
+eval val@(Parser.Atom _)   = return val
+eval val@(Parser.String _) = return val
+eval val@(Parser.Number _) = return val
+eval val@(Parser.Bool _)   = return val
+eval (Parser.ProperList [Parser.Atom "quote", val]) = return val
+eval (Parser.ProperList (Parser.Atom f : args)) = mapM eval args >>= apply f
+eval badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
+
+apply :: String -> [Parser.LispVal] -> ThrowsError Parser.LispVal
+apply f args = 
+  maybe 
+    (throwError $ NotFunction "Unrecognized primitive function args" f) 
+    ($ args) 
+    (lookup f primitives)
+
+primitives :: [(String, [Parser.LispVal] -> ThrowsError Parser.LispVal)]
 primitives =  [ ("+", numericBinop (+))
               , ("-", numericBinop (-))
               , ("*", numericBinop (*))
@@ -21,25 +60,29 @@ primitives =  [ ("+", numericBinop (+))
               , ("mod", numericBinop mod)
               , ("quotient", numericBinop quot)
               , ("remainder", numericBinop rem)
-              , ("symbol?", to1Arity isSymbol)
-              , ("number?", to1Arity isNumber)
-              , ("string?", to1Arity isString)
-              , ("bool?", to1Arity isBool)
+              , ("symbol?", return . to1Arity isSymbol)
+              , ("number?", return . to1Arity isNumber)
+              , ("string?", return . to1Arity isString)
+              , ("bool?", return . to1Arity isBool)
               , ("symbol->string", to1Arity symbolToString)
               , ("string->symbol", to1Arity stringToSymbol)
               ]
 
-numericBinop :: (Integer -> Integer -> Integer) -> [Parser.LispVal] -> Parser.LispVal
-numericBinop op args = Parser.Number $ foldl1 op $ map unpackNum args
+numericBinop :: (Integer -> Integer -> Integer) -> [Parser.LispVal] -> ThrowsError Parser.LispVal
+numericBinop op []    = throwError $ NumArgs 2 []
+numericBinop op x@[_] = throwError $ NumArgs 2 x
+numericBinop op args  = unpackArgs args >>= runOp
+  where runOp       = return . Parser.Number . foldl1 op
+        unpackArgs  = traverse unpackNum
 
-unpackNum :: Parser.LispVal -> Integer
-unpackNum (Parser.Number n) = n
+unpackNum :: Parser.LispVal -> ThrowsError Integer
+unpackNum (Parser.Number n) = return n
 unpackNum (Parser.String n) = let parsed = reads n :: [(Integer, String)] in
                            if null parsed
-                              then 0
-                              else fst $ parsed !! 0
+                              then throwError $ TypeMismatch "number" $ Parser.String n
+                              else return $ fst $ parsed !! 0
 unpackNum (Parser.ProperList [n]) = unpackNum n
-unpackNum _ = 0
+unpackNum x = throwError $ TypeMismatch "number" x
 
 to1Arity :: (a -> b) -> [a] -> b
 to1Arity f (x : _) = f x
@@ -60,10 +103,10 @@ isBool :: Parser.LispVal -> Parser.LispVal
 isBool (Parser.Bool _) = Parser.Bool True
 isBool _ = Parser.Bool False
 
--- What should these functions return if given a value that isn't a string/atom?
+symbolToString :: Parser.LispVal -> ThrowsError Parser.LispVal
+symbolToString  (Parser.Atom s) = return $ Parser.String s
+symbolToString  x = throwError $ TypeMismatch "symbol" x
 
-symbolToString :: Parser.LispVal -> Parser.LispVal
-symbolToString  (Parser.Atom s) = Parser.String s
-
-stringToSymbol :: Parser.LispVal -> Parser.LispVal
-stringToSymbol  (Parser.String s) = Parser.Atom s
+stringToSymbol :: Parser.LispVal -> ThrowsError Parser.LispVal
+stringToSymbol  (Parser.String s) = return $ Parser.Atom s
+stringToSymbol  x = throwError $ TypeMismatch "string" x
