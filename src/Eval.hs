@@ -22,8 +22,9 @@ primitives =  [ ("+", numericBinop (+))
               , ("quotient", numericBinop quot)
               , ("remainder", numericBinop rem)
               , ("symbol?", to1Arity isSymbol)
-              , ("string?", to1Arity isString)
               , ("number?", to1Arity isNumber)
+              , ("string?", to1Arity isString)
+              , ("bool?", to1Arity isBool)
               ]
 
 numericBinop :: (Integer -> Integer -> Integer) -> [Parser.LispVal] -> Parser.LispVal
@@ -52,3 +53,7 @@ isString _ = Parser.Bool False
 isNumber :: Parser.LispVal -> Parser.LispVal
 isNumber (Parser.Number _) = Parser.Bool True
 isNumber _ = Parser.Bool False
+
+isBool :: Parser.LispVal -> Parser.LispVal
+isBool (Parser.Bool _) = Parser.Bool True
+isBool _ = Parser.Bool False
