@@ -1,5 +1,6 @@
 module Parser where
 
+import Data.List as List
 import Control.Applicative ((<|>), empty)
 import Control.Monad.Combinators (between)
 import qualified Text.Megaparsec.Char as Char
@@ -20,7 +21,19 @@ data LispVal
   | Bool Bool
   | ProperList [LispVal]
   | ImproperList [LispVal] LispVal
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance Show LispVal where
+  show (Atom a) = a
+  show (Number i) = show i
+  show (String s) = "\"" ++ s ++ "\""
+  show (Bool True) = "#t"
+  show (Bool False) = "#f"
+  show (ProperList l) = "(" ++ (showLispList l) ++ ")"
+  show (ImproperList l x) = "(" ++ (showLispList l) ++ show x ++ ")"
+
+showLispList :: [LispVal] -> String
+showLispList = List.intercalate " " . fmap show
 
 parse :: String -> String -> Either ParseError LispVal
 parse filename input = Mega.parse lispSyntax filename input
