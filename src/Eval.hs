@@ -25,6 +25,8 @@ primitives =  [ ("+", numericBinop (+))
               , ("number?", to1Arity isNumber)
               , ("string?", to1Arity isString)
               , ("bool?", to1Arity isBool)
+              , ("symbol->string", to1Arity symbolToString)
+              , ("string->symbol", to1Arity stringToSymbol)
               ]
 
 numericBinop :: (Integer -> Integer -> Integer) -> [Parser.LispVal] -> Parser.LispVal
@@ -57,3 +59,11 @@ isNumber _ = Parser.Bool False
 isBool :: Parser.LispVal -> Parser.LispVal
 isBool (Parser.Bool _) = Parser.Bool True
 isBool _ = Parser.Bool False
+
+-- What should these functions return if given a value that isn't a string/atom?
+
+symbolToString :: Parser.LispVal -> Parser.LispVal
+symbolToString  (Parser.Atom s) = Parser.String s
+
+stringToSymbol :: Parser.LispVal -> Parser.LispVal
+stringToSymbol  (Parser.String s) = Parser.Atom s
