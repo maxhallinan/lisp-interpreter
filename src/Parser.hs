@@ -100,7 +100,7 @@ atom = do
       first <- initial 
       rest  <- Mega.many subsequent
       return $ first : rest
-    initial     = Char.letterChar <|> Char.oneOf "!$%&*/:<=>?~_^"
+    initial     = Char.letterChar <|> Char.oneOf "!$%&*/:<=>?~_^|"
     subsequent  = initial <|> Char.digitChar <|> Char.oneOf ".+-"
 
 bool :: Parser LispVal

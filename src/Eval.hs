@@ -66,7 +66,46 @@ primitives =  [ ("+", numericBinop (+))
               , ("bool?", return . to1Arity isBool)
               , ("symbol->string", to1Arity symbolToString)
               , ("string->symbol", to1Arity stringToSymbol)
+              , ("=", numBoolBinop (==))
+              , ("<", numBoolBinop (<))
+              , (">", numBoolBinop (>))
+              , ("/=", numBoolBinop (/=))
+              , (">=", numBoolBinop (>=))
+              , ("<=", numBoolBinop (<=))
+              , ("&&", boolBoolBinop (&&))
+              , ("||", boolBoolBinop (||))
+              , ("string=?", strBoolBinop (==))
+              , ("string<?", strBoolBinop (<))
+              , ("string>?", strBoolBinop (>))
+              , ("string<=?", strBoolBinop (<=))
+              , ("string>=?", strBoolBinop (>=))
               ]
+
+boolBinop :: (Parser.LispVal -> ThrowsError a) -> (a -> a -> Bool) -> [Parser.LispVal] -> ThrowsError Parser.LispVal
+boolBinop unpacker op args = if length args /= 2
+                             then throwError $ NumArgs 2 args
+                             else do left <- unpacker $ head args
+                                     right <- unpacker $ args !! 1
+                                     return $ Parser.Bool $ left `op` right
+
+numBoolBinop :: (Integer -> Integer -> Bool) -> [Parser.LispVal] -> ThrowsError Parser.LispVal
+numBoolBinop = boolBinop unpackNum
+
+strBoolBinop :: (String -> String -> Bool) -> [Parser.LispVal] -> ThrowsError Parser.LispVal
+strBoolBinop = boolBinop unpackStr
+
+boolBoolBinop :: (Bool -> Bool -> Bool) -> [Parser.LispVal] -> ThrowsError Parser.LispVal
+boolBoolBinop = boolBinop unpackBool
+
+unpackStr :: Parser.LispVal -> ThrowsError String
+unpackStr (Parser.String x) = return x
+unpackStr (Parser.Number x) = return $ show x
+unpackStr (Parser.Bool x) = return $ show x
+unpackStr x = throwError $ TypeMismatch "string" x
+
+unpackBool :: Parser.LispVal -> ThrowsError Bool
+unpackBool (Parser.Bool x) = return x
+unpackBool x = throwError $ TypeMismatch "boolean" x
 
 numericBinop :: (Integer -> Integer -> Integer) -> [Parser.LispVal] -> ThrowsError Parser.LispVal
 numericBinop op []    = throwError $ NumArgs 2 []
