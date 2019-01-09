@@ -42,6 +42,11 @@ eval val@(Parser.String _) = return val
 eval val@(Parser.Number _) = return val
 eval val@(Parser.Bool _)   = return val
 eval (Parser.ProperList [Parser.Atom "quote", val]) = return val
+eval (Parser.ProperList [Parser.Atom "if", predicate, consequent, alternate]) = do
+  result <- eval predicate
+  case result of
+    Parser.Bool False -> eval alternate
+    otherwise -> eval consequent
 eval (Parser.ProperList (Parser.Atom f : args)) = mapM eval args >>= apply f
 eval badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
