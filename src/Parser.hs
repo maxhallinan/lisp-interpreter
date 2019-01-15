@@ -30,7 +30,7 @@ instance Show LispVal where
   show (Bool True) = "#t"
   show (Bool False) = "#f"
   show (ProperList l) = "(" ++ (showLispList l) ++ ")"
-  show (ImproperList l x) = "(" ++ (showLispList l) ++ show x ++ ")"
+  show (ImproperList l x) = "(" ++ (showLispList l) ++ " " ++ show x ++ ")"
 
 showLispList :: [LispVal] -> String
 showLispList = unwords . map show

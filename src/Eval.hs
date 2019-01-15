@@ -3,6 +3,7 @@ module Eval where
 import Data.Traversable (mapM)
 import Control.Monad.Except (catchError, throwError)
 import qualified Parser as Parser
+import Control.Monad (liftM)
 
 data LispError 
   = NumArgs Integer [Parser.LispVal]
@@ -36,6 +37,10 @@ readExpr filename input =
     Left err      -> throwError $ ParseError err
     Right lispVal -> return lispVal
 
+evalString :: String -> IO String
+evalString expr = 
+  return $ extractValue $ trapError (liftM show $ readExpr "" expr >>= eval)
+
 eval :: Parser.LispVal -> ThrowsError Parser.LispVal
 eval val@(Parser.Atom _)   = return val
 eval val@(Parser.String _) = return val
@@ -48,6 +53,10 @@ eval (Parser.ProperList [Parser.Atom "if", predicate, consequent, alternate]) = 
     Parser.Bool False -> eval alternate
     otherwise -> eval consequent
 eval (Parser.ProperList (Parser.Atom f : args)) = mapM eval args >>= apply f
+eval (Parser.ImproperList (Parser.Atom f : xs) x) = do
+  evaledXs <- mapM eval xs
+  evaledX <- eval x
+  return $ Parser.ImproperList evaledXs evaledX
 eval badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
 apply :: String -> [Parser.LispVal] -> ThrowsError Parser.LispVal
@@ -84,7 +93,49 @@ primitives =  [ ("+", numericBinop (+))
               , ("string>?", strBoolBinop (>))
               , ("string<=?", strBoolBinop (<=))
               , ("string>=?", strBoolBinop (>=))
+              , ("car", car)
+              , ("cdr", cdr)
+              , ("cons", cons)
               ]
+
+car :: [Parser.LispVal] -> ThrowsError Parser.LispVal
+car [Parser.ProperList (x : _)] = return x
+car [Parser.ImproperList (x : _) _] = return x
+car [badArg] = throwError $ TypeMismatch "pair" badArg
+car badArgList = throwError $ NumArgs 1 badArgList
+
+cdr :: [Parser.LispVal] -> ThrowsError Parser.LispVal
+cdr [Parser.ProperList (_ : xs)] = return $ Parser.ProperList xs
+cdr [Parser.ImproperList [_] x] = return x
+cdr [Parser.ImproperList (_ : xs) x] = return $ Parser.ImproperList xs x
+cdr [badArg] = throwError $ TypeMismatch "pair" badArg
+cdr badArgList = throwError $ NumArgs 1 badArgList
+
+cons :: [Parser.LispVal] -> ThrowsError Parser.LispVal
+cons [x, Parser.ProperList []] = return $ Parser.ProperList [x]
+cons [x, Parser.ProperList xs] = return $ Parser.ProperList (x : xs)
+cons [x1, Parser.ImproperList xs x2] = return $ Parser.ImproperList (x1 : xs) x2
+cons [x1, x2] = return $ Parser.ImproperList [x1] x2
+cons badArgList = throwError $ NumArgs 2 badArgList
+
+eqv :: [Parser.LispVal] -> ThrowsError Parser.LispVal
+eqv [(Parser.Bool x1), (Parser.Bool x2)] = return $ Parser.Bool $ x1 == x2
+eqv [(Parser.Number x1), (Parser.Number x2)] = return $ Parser.Bool $ x1 == x2
+eqv [(Parser.String x1), (Parser.String x2)] = return $ Parser.Bool $ x1 == x2
+eqv [(Parser.Atom x1), (Parser.Atom x2)] = return $ Parser.Bool $ x1 == x2
+eqv [(Parser.ImproperList xs1 x1),(Parser.ImproperList xs2 x2)] = 
+  eqv [(Parser.ProperList (xs1 ++ [x1])), (Parser.ProperList (xs2 ++ [x2]))]
+eqv [(Parser.ProperList xs1), (Parser.ProperList xs2)] = 
+  return $ Parser.Bool (isSameLength && isEqvList) 
+  where 
+    isSameLength = length xs1 == length xs2
+    isEqvList = all eqvPair $ zip xs1 xs2
+    eqvPair (x1, x2) =
+      case eqv [x1, x2] of
+        Left _ -> False
+        Right (Parser.Bool val) -> val 
+eqv [_, _] = return $ Parser.Bool False
+eqv badArgList = throwError $ NumArgs 2 badArgList
 
 boolBinop :: (Parser.LispVal -> ThrowsError a) -> (a -> a -> Bool) -> [Parser.LispVal] -> ThrowsError Parser.LispVal
 boolBinop unpacker op args = if length args /= 2
