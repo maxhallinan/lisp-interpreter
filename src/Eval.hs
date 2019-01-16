@@ -4,6 +4,14 @@ import Data.Traversable (mapM)
 import Control.Monad.Except (catchError, throwError)
 import qualified Parser as Parser
 import Control.Monad (liftM)
+import qualified Data.IORef as Ref
+
+type Env = Ref.IORef [(String, Ref.IORef Parser.LispVal)]
+
+defaultEnv :: IO Env
+defaultEnv = Ref.newIORef []
+
+-- type IOThrowsError = ExceptT LispError IO
 
 data LispError 
   = NumArgs Integer [Parser.LispVal]
