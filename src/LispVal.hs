@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module LispVal where
+module LispVal (LispVal(..), IFunc, EnvCtx, Eval) where
 
 import qualified Data.Map as Map
 import qualified Data.Typeable as T
