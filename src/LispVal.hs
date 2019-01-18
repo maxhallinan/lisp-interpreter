@@ -3,25 +3,26 @@
 module LispVal (LispVal(..), IFunc, EnvCtx, Eval) where
 
 import qualified Data.Map as Map
+import qualified Data.Text as T
+import qualified Data.String as S
 import qualified Data.Typeable as T
 import qualified Control.Monad.Except as E
 import qualified Control.Monad.Reader as R
-import Data.Text as T
 
 data LispVal 
-  = Atom T.Text 
+  = Symbol String 
   | List [LispVal]
-  | Number Integer
-  | String T.Text
+  | Int Integer
+  | Str String
   | Fun IFunc
   | Lambda IFunc EnvCtx
   | Nil
-  | Bool Bool 
+  | Bol Bool 
   deriving (T.Typeable)
 
 data IFunc = IFunc { fn :: [LispVal] -> Eval LispVal }
 
-type EnvCtx = Map.Map T.Text LispVal
+type EnvCtx = Map.Map String LispVal
 
 newtype Eval a = Eval { unEval :: R.ReaderT EnvCtx IO a }
   deriving  ( Monad
@@ -32,17 +33,17 @@ newtype Eval a = Eval { unEval :: R.ReaderT EnvCtx IO a }
             )
 
 instance Show LispVal where
-  show = T.unpack . showLispVal
+  show = showLispVal
 
-showLispVal :: LispVal -> T.Text
+showLispVal :: LispVal -> String
 showLispVal x = 
   case x of
-    (Atom atom) -> atom
-    (String str) -> T.concat ["\"", str, "\""]
-    (Number num) -> T.pack $ show num
-    (Bool True) -> "#t"
-    (Bool False) -> "#f"
-    Nil -> "Nil"
-    (List xs) -> T.concat ["(", T.unwords $ showLispVal <$> xs, ")"]
+    (Symbol sym) -> sym
+    (Str str) -> concat ["\"", str, "\""]
+    (Int int) -> show int
+    (Bol True) -> "true"
+    (Bol False) -> "false"
+    Nil -> "()"
+    (List xs) -> concat ["(", S.unwords $ showLispVal <$> xs, ")"]
     (Fun _) -> "<internal function>"
     (Lambda _ _) -> "<lambda function>"
