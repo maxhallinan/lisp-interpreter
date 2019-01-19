@@ -98,10 +98,13 @@ eval (L.List [L.Symbol "lambda", L.List params, expr]) = do
   env <- R.ask
   return $ L.Lambda (L.IFunc $ applyLambda expr params) env
 eval (L.List (L.Symbol "lambda":_)) = throw $ L.BadSpecialForm "lambda"
--- evaluate function application
+-- evaluate the special form `delay`
 eval (L.List [L.Symbol "delay", expr]) = do
   env <- R.ask
-  return $ L.Lambda (L.IFunc $ (\_ -> applyLambda expr [] [])) env
+  return $ L.Lambda (L.IFunc thunk) env
+  where thunk (L.Nil : [])  = applyLambda expr [] []
+        thunk args          = throw $ L.NumArgs 1 args
+-- evaluate function application
 eval (L.List ((:) x xs)) = do
   fn  <- eval x
   x   <- traverse eval xs
