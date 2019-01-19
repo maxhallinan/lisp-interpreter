@@ -1,13 +1,18 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module LispVal (LispVal(..), IFunc, EnvCtx, Eval) where
+module LispVal 
+  ( EnvCtx
+  , Eval(..)
+  , IFunc(..)
+  , LispException(..)
+  , LispVal(..)
+  ) where
 
-import qualified Data.Map as Map
-import qualified Data.Text as T
-import qualified Data.String as S
-import qualified Data.Typeable as T
+import Control.Exception (Exception)
 import qualified Control.Monad.Except as E
 import qualified Control.Monad.Reader as R
+import qualified Data.Map as M
+import qualified Data.String as S
+import qualified Data.Typeable as T
 
 data LispVal 
   = Symbol String 
@@ -22,7 +27,7 @@ data LispVal
 
 data IFunc = IFunc { fn :: [LispVal] -> Eval LispVal }
 
-type EnvCtx = Map.Map String LispVal
+type EnvCtx = M.Map String LispVal
 
 newtype Eval a = Eval { unEval :: R.ReaderT EnvCtx IO a }
   deriving  ( Monad
@@ -47,3 +52,14 @@ showLispVal x =
     (List xs) -> concat ["(", S.unwords $ showLispVal <$> xs, ")"]
     (Fun _) -> "<internal function>"
     (Lambda _ _) -> "<lambda function>"
+
+data LispException 
+  = NumArgs Integer [LispVal]
+  | PError String
+  | UnboundVar String
+  | BadSpecialForm String
+  | TypeMismatch String LispVal
+  | NotFunction LispVal
+  deriving (Show)
+
+instance Exception LispException

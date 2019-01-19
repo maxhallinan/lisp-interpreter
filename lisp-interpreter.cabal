@@ -1,0 +1,76 @@
+-- This file has been generated from package.yaml by hpack version 0.28.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 4228220529034f26339e72764099d17452c0daeb4e31fdc56e8e986a788185cc
+
+name:           lisp-interpreter
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/lisp-interpreter#readme>
+homepage:       https://github.com/githubuser/lisp-interpreter#readme
+bug-reports:    https://github.com/githubuser/lisp-interpreter/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2018 Author name here
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+cabal-version:  >= 1.10
+extra-source-files:
+    ChangeLog.md
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/lisp-interpreter
+
+library
+  exposed-modules:
+      Cli
+      Eval
+      Lib
+      LispVal
+      Parser
+      Prim
+      Repl
+      Types
+  other-modules:
+      Paths_lisp_interpreter
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , megaparsec
+    , parser-combinators
+    , containers
+    , mtl
+  default-language: Haskell2010
+
+executable lisp-interpreter-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_lisp_interpreter
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , lisp-interpreter
+  default-language: Haskell2010
+
+test-suite lisp-interpreter-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      ParserSpec
+      Paths_lisp_interpreter
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      QuickCheck
+    , base >=4.7 && <5
+    , hspec
+    , lisp-interpreter
+    , megaparsec
+  default-language: Haskell2010
