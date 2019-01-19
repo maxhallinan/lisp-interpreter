@@ -1,49 +1,90 @@
-module Parser where
+module Parser (readSexpr, readSexprFile) where
 
-import Control.Applicative ((<|>), empty)
+import Control.Applicative ((<|>))
 import Control.Monad.Combinators (between)
-import qualified Data.List as List
 import qualified Text.Megaparsec.Char as Char
 import qualified Text.Megaparsec.Char.Lexer as Lex
-import qualified Text.Megaparsec.Expr as Expr
 import qualified Text.Megaparsec as Mega
 import qualified Text.Megaparsec.Error as Err
 import Data.Void (Void)
+import qualified LispVal as L
 
 type Parser = Mega.Parsec Void String
 
 type ParseError = Err.ParseError Char Void
 
-data LispVal
-  = Atom String
-  | Number Integer
-  | String String
-  | Bool Bool
-  | ProperList [LispVal]
-  | ImproperList [LispVal] LispVal
-  deriving (Eq)
+readSexprFile :: String -> String -> Either ParseError L.LispVal
+readSexprFile filename = Mega.parse (contents parseProgram) filename
+  where parseProgram = L.List <$> Mega.sepBy sexpr space
 
-instance Show LispVal where
-  show (Atom a) = a
-  show (Number i) = show i
-  show (String s) = "\"" ++ s ++ "\""
-  show (Bool True) = "#t"
-  show (Bool False) = "#f"
-  show (ProperList l) = "(" ++ (showLispList l) ++ ")"
-  show (ImproperList l x) = "(" ++ (showLispList l) ++ show x ++ ")"
+readSexpr :: String -> Either ParseError L.LispVal
+readSexpr = Mega.parse (contents sexpr) "<stdin>"
 
-showLispList :: [LispVal] -> String
-showLispList = unwords . map show
+contents :: Parser a -> Parser a
+contents p = between space Mega.eof p
 
-parse :: String -> String -> Either ParseError LispVal
-parse filename input = Mega.parse lispSyntax filename input
+sexpr :: Parser L.LispVal
+sexpr = lexeme $ atom <|> list 
 
-lispSyntax :: Parser LispVal
-lispSyntax = between space Mega.eof lispVal
+list :: Parser L.LispVal
+list = do
+  symbol' "("
+  xs <- Mega.many sexpr
+  symbol' ")"
+  case xs of
+    [] -> return $ L.Nil
+    _ -> return $ L.List xs
 
-lispVal :: Parser LispVal
-lispVal = lexeme $ bool <|> atom <|> number <|> string <|> list
+atom :: Parser L.LispVal
+atom = integer <|> string <|> quote <|> symbol
 
+integer :: Parser L.LispVal
+integer = unsignedInteger <|> signedInteger
+
+signedInteger :: Parser L.LispVal
+signedInteger = do
+  _ <- Char.char '-'
+  number <- Mega.some Char.digitChar
+  return $ L.Int (negate . read $ number)
+
+unsignedInteger :: Parser L.LispVal
+unsignedInteger = do
+  number <- Mega.some Char.digitChar
+  return $ L.Int (read number)
+
+string :: Parser L.LispVal
+string = do
+  Char.char '"'
+  s <- Mega.many (escapedQuoteChar <|> Char.noneOf "\"")
+  Char.char '"'
+  return $ L.Str s
+
+quote :: Parser L.LispVal
+quote = do
+  _ <- Char.char '\''
+  x <- sexpr
+  return $ L.List [L.Symbol "quote", x]
+
+symbol :: Parser L.LispVal
+symbol = do
+  sym <-  identifier
+          <|> Char.string "+"
+          <|> Char.string "-"
+          <|> Char.string "..."
+  case sym of
+    "nil" -> return $ L.Nil
+    "true" -> return $ L.Bol True
+    "false" -> return $ L.Bol False
+    otherwise -> return $ L.Symbol sym
+  where 
+    identifier = do 
+      first <- initial 
+      rest  <- Mega.many subsequent
+      return $ (first : rest)
+    initial     = Char.letterChar <|> Char.oneOf "!$%&*/:<=>?~_^"
+    subsequent  = initial <|> Char.digitChar <|> Char.oneOf ".+-"
+
+-- TODO: add support for hash bang (e.g. `#! /bin/sh`) comment
 space :: Parser ()
 space = Lex.space Char.space1 lineComment blockComment
   where
@@ -51,85 +92,36 @@ space = Lex.space Char.space1 lineComment blockComment
     lineComment = Lex.skipLineComment ";"
 
     blockComment :: Parser ()
-    blockComment = Lex.skipBlockComment ";" "\n"
+    blockComment = Lex.skipBlockComment "#|" "|#"
 
 lexeme :: Parser a -> Parser a
 lexeme = Lex.lexeme space
 
-symbol :: String -> Parser String
-symbol = Lex.symbol space
-
-parens :: Parser a -> Parser a
-parens = between (symbol "(") (symbol ")")
+symbol' :: String -> Parser String
+symbol' = Lex.symbol space
 
 escaped :: Char -> Parser Char
 escaped x = Char.char '\\' >> Char.char x
 
-quoteChar :: Parser Char
-quoteChar = escaped '"'
+escapedQuoteChar :: Parser Char
+escapedQuoteChar = escaped '"'
 
-newlineChar :: Parser Char
-newlineChar = escaped 'n' >> return '\n'
+-- newlineChar :: Parser Char
+-- newlineChar = escaped 'n' >> return '\n'
 
-escapeChar :: Parser Char
-escapeChar = escaped '\\'
+-- escapeChar :: Parser Char
+-- escapeChar = escaped '\\'
 
-returnChar :: Parser Char
-returnChar = escaped 'r' >> return '\r'
+-- returnChar :: Parser Char
+-- returnChar = escaped 'r' >> return '\r'
 
-tabChar :: Parser Char
-tabChar = escaped 't' >> return '\t'
+-- tabChar :: Parser Char
+-- tabChar = escaped 't' >> return '\t'
 
-escapedChar :: Parser Char
-escapedChar = 
-      Mega.try quoteChar 
-  <|> Mega.try newlineChar 
-  <|> Mega.try escapeChar 
-  <|> Mega.try returnChar 
-  <|> Mega.try tabChar
-
-atom :: Parser LispVal
-atom = do
-  first <- Char.letterChar <|> Char.symbolChar
-  rest <- Mega.many (Char.noneOf ") ") 
-  let atom = first : rest
-  return $ Atom atom
-
-bool :: Parser LispVal
-bool = do
-  Char.char '#'
-  bool <- toBool <$> (Char.char 't' <|> Char.char 'f')
-  return $ Bool bool
-  where
-    toBool 'f' = False
-    toBool 't' = True
-
-number :: Parser LispVal
-number = do
-  number <- Mega.some Char.digitChar
-  return $ Number (read number)
-
-string :: Parser LispVal
-string = do
-  Char.char '"'
-  stringValue <- Mega.many (escapedChar <|> Char.noneOf "\"")
-  Char.char '"'
-  return $ String stringValue
-
-list :: Parser LispVal
-list = do
-  symbol "("
-  x <- Mega.try improperList <|> properList
-  symbol ")"
-  return x
-
-properList :: Parser LispVal
-properList = do
-  terms <- Mega.many lispVal
-  return $ ProperList terms
-
-improperList :: Parser LispVal
-improperList = do
-  head <- Mega.manyTill lispVal (symbol ".")
-  tail <- lispVal
-  return $ ImproperList head tail
+-- escapedChar :: Parser Char
+-- escapedChar = 
+--       Mega.try quoteChar 
+--   <|> Mega.try newlineChar 
+--   <|> Mega.try escapeChar 
+--   <|> Mega.try returnChar 
+--   <|> Mega.try tabChar
