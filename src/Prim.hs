@@ -26,20 +26,20 @@ primEnv =
   , ("<=", mkFn $ binop (numCmp (<=))) 
   , (">=", mkFn $ binop (numCmp (>=))) 
   , ("==", mkFn $ binop (numCmp (==))) 
-  -- , ("++", ) 
-  -- , ("even?", ) 
+  , ("and", mkFn $ binop (bolOp (&&))) 
+  , ("or", mkFn $ binop (bolOp (||))) 
   -- , ("odd?", ) 
   -- , ("pos?", ) 
   -- , ("neg?", ) 
+  -- , ("even?", ) 
   -- , ("eq?", ) 
   -- , ("bl-eq?", ) 
-  -- , ("and", ) 
-  -- , ("or", ) 
   -- , ("cons", ) 
   -- , ("cdr", ) 
   -- , ("car", ) 
   -- , ("file?", ) 
   -- , ("slurp?", ) 
+  -- , ("++", ) 
   ]
 
 mkFn :: ([L.LispVal] -> L.Eval L.LispVal) -> L.LispVal
@@ -69,3 +69,8 @@ numCmp :: (Integer -> Integer -> Bool) -> L.LispVal -> L.LispVal -> L.Eval L.Lis
 numCmp op  (L.Int x) (L.Int y) = return $ L.Bol (op x y)
 numCmp _   (L.Int _) y         = throw $ L.TypeMismatch "integer" y
 numCmp _   x         _         = throw $ L.TypeMismatch "integer" x
+
+bolOp :: (Bool -> Bool -> Bool) -> L.LispVal -> L.LispVal -> L.Eval L.LispVal
+bolOp op  (L.Bol x) (L.Bol y) = return $ L.Bol (op x y)
+bolOp _   (L.Int _) y         = throw $ L.TypeMismatch "boolean" y
+bolOp _   x         _         = throw $ L.TypeMismatch "boolean" x
