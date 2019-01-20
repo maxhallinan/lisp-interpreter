@@ -21,11 +21,11 @@ primEnv =
   [ ("+", mkFn $ binopFold (numOp (+)))
   , ("*", mkFn $ binopFold (numOp (*)))
   , ("-", mkFn $ binopFold (numOp (-))) 
-  -- , ("<", ) 
-  -- , ("<=", ) 
-  -- , (">", ) 
-  -- , (">=", ) 
-  -- , ("==", ) 
+  , ("<", mkFn $ binop (numCmp (<))) 
+  , (">", mkFn $ binop (numCmp (>))) 
+  , ("<=", mkFn $ binop (numCmp (<=))) 
+  , (">=", mkFn $ binop (numCmp (>=))) 
+  , ("==", mkFn $ binop (numCmp (==))) 
   -- , ("++", ) 
   -- , ("even?", ) 
   -- , ("odd?", ) 
@@ -64,3 +64,8 @@ numOp :: (Integer -> Integer -> Integer) -> L.LispVal -> L.LispVal -> L.Eval L.L
 numOp op  (L.Int x) (L.Int y) = return $ L.Int (op x y)
 numOp _   (L.Int _) y         = throw $ L.TypeMismatch "integer" y
 numOp _   x         _         = throw $ L.TypeMismatch "integer" x
+
+numCmp :: (Integer -> Integer -> Bool) -> L.LispVal -> L.LispVal -> L.Eval L.LispVal
+numCmp op  (L.Int x) (L.Int y) = return $ L.Bol (op x y)
+numCmp _   (L.Int _) y         = throw $ L.TypeMismatch "integer" y
+numCmp _   x         _         = throw $ L.TypeMismatch "integer" x
