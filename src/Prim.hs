@@ -1,4 +1,4 @@
-module Prim 
+module Prim
   ( PrimEnv
   , binop
   , binopFold
@@ -11,6 +11,7 @@ import Control.Monad (foldM)
 import Data.Foldable (all, foldl)
 import Data.Traversable (traverse)
 import qualified System.Directory as Dir
+import qualified System.IO as SysIO
 import Control.Monad.IO.Class (liftIO)
 import qualified LispVal as L
 
@@ -19,28 +20,28 @@ type Unary    = L.LispVal -> L.Eval L.LispVal
 type Binary   = L.LispVal -> L.LispVal -> L.Eval L.LispVal
 
 primEnv :: PrimEnv
-primEnv = 
+primEnv =
   [ ("+", mkFn $ binopFold (numOp (+)))
   , ("*", mkFn $ binopFold (numOp (*)))
-  , ("-", mkFn $ binopFold (numOp (-))) 
-  , ("<", mkFn $ binop (numCmp (<))) 
-  , (">", mkFn $ binop (numCmp (>))) 
-  , ("<=", mkFn $ binop (numCmp (<=))) 
-  , (">=", mkFn $ binop (numCmp (>=))) 
-  , ("==", mkFn $ binop (numCmp (==))) 
-  , ("and", mkFn $ binop (bolOp (&&))) 
-  , ("or", mkFn $ binop (bolOp (||))) 
-  , ("cons", mkFn $ binop consOp) 
-  , ("cdr", mkFn $ unop cdrOp) 
-  , ("car", mkFn $ unop carOp) 
-  , ("odd?", mkFn $ unop oddOp) 
-  , ("even?", mkFn $ unop evenOp) 
-  , ("pos?", mkFn $ unop (numBol (0 <))) 
-  , ("neg?", mkFn $ unop (numBol (0 >))) 
-  , ("++", mkFn $ binop (strOp (++))) 
-  , ("eq?", mkFn $ binop eqOp) 
-  , ("file?", mkFn $ unop doesFileExist) 
-  -- , ("slurp?", ) 
+  , ("-", mkFn $ binopFold (numOp (-)))
+  , ("<", mkFn $ binop (numCmp (<)))
+  , (">", mkFn $ binop (numCmp (>)))
+  , ("<=", mkFn $ binop (numCmp (<=)))
+  , (">=", mkFn $ binop (numCmp (>=)))
+  , ("==", mkFn $ binop (numCmp (==)))
+  , ("and", mkFn $ binop (bolOp (&&)))
+  , ("or", mkFn $ binop (bolOp (||)))
+  , ("cons", mkFn $ binop consOp)
+  , ("cdr", mkFn $ unop cdrOp)
+  , ("car", mkFn $ unop carOp)
+  , ("odd?", mkFn $ unop oddOp)
+  , ("even?", mkFn $ unop evenOp)
+  , ("pos?", mkFn $ unop (numBol (0 <)))
+  , ("neg?", mkFn $ unop (numBol (0 >)))
+  , ("++", mkFn $ binop (strOp (++)))
+  , ("eq?", mkFn $ binop eqOp)
+  , ("file?", mkFn $ unop doesFileExist)
+  , ("slurp?", mkFn $ unop slurpOp)
   ]
 
 mkFn :: ([L.LispVal] -> L.Eval L.LispVal) -> L.LispVal
@@ -55,7 +56,7 @@ binop op [x, y] = op x y
 binop _ args    = throw $ L.NumArgs 2 args
 
 binopFold :: Binary -> [L.LispVal] -> L.Eval L.LispVal
-binopFold op args = 
+binopFold op args =
   case args of
     [x, y] -> op x y
     (x:xs) -> foldM op x xs
@@ -97,7 +98,7 @@ carOp x               = throw $ L.ExpectedList "cdr" x
 
 cdrOp :: L.LispVal -> L.Eval L.LispVal
 cdrOp (L.List [])       = throw $ L.LengthOfList "cdr" 1
-cdrOp (L.List [x])      = return L.Nil 
+cdrOp (L.List [x])      = return L.Nil
 cdrOp (L.List (_:xs))   = return $ L.List xs
 cdrOp x                 = throw $ L.ExpectedList "cdr" x
 
@@ -121,3 +122,18 @@ doesFileExist :: L.LispVal -> L.Eval L.LispVal
 doesFileExist (L.Symbol s) = doesFileExist $ L.Str s
 doesFileExist (L.Str s)    = L.Bol <$> liftIO (Dir.doesFileExist s)
 doesFileExist x            = throw $ L.TypeMismatch "string" x
+
+slurpOp :: L.LispVal -> L.Eval L.LispVal
+slurpOp (L.Symbol s)  = slurpOp $ L.Str s
+slurpOp (L.Str s)     = liftIO $ readTextFile s
+slurpOp x             = throw $ L.TypeMismatch "string" x
+
+readTextFile :: String -> IO L.LispVal
+readTextFile filename = SysIO.withFile filename SysIO.ReadMode go
+  where
+    go :: SysIO.Handle -> IO L.LispVal
+    go handle = do
+      isFile <- SysIO.hIsEOF handle
+      if isFile
+      then (SysIO.hGetContents handle) >>= (return . L.Str)
+      else throw . L.IOError $ concat ["file does not exist: ", filename]
