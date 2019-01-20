@@ -10,6 +10,8 @@ import Control.Exception (throw)
 import Control.Monad (foldM)
 import Data.Foldable (all, foldl)
 import Data.Traversable (traverse)
+import qualified System.Directory as Dir
+import Control.Monad.IO.Class (liftIO)
 import qualified LispVal as L
 
 type PrimEnv  = [(String, L.LispVal)]
@@ -37,7 +39,7 @@ primEnv =
   , ("neg?", mkFn $ unop (numBol (0 >))) 
   , ("++", mkFn $ binop (strOp (++))) 
   , ("eq?", mkFn $ binop eqOp) 
-  -- , ("file?", ) 
+  , ("file?", mkFn $ unop doesFileExist) 
   -- , ("slurp?", ) 
   ]
 
@@ -114,3 +116,8 @@ eqOp (L.Int x)    (L.Int y)     = return $ L.Bol (x == y)
 eqOp (L.Bol x)    (L.Bol y)     = return $ L.Bol (x == y)
 eqOp L.Nil        L.Nil         = return $ L.Bol True
 eqOp _ _                        = return $ L.Bol False
+
+doesFileExist :: L.LispVal -> L.Eval L.LispVal
+doesFileExist (L.Symbol s) = doesFileExist $ L.Str s
+doesFileExist (L.Str s)    = L.Bol <$> liftIO (Dir.doesFileExist s)
+doesFileExist x            = throw $ L.TypeMismatch "string" x
