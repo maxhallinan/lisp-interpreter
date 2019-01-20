@@ -24,6 +24,7 @@ primEnv =
   [ ("+", mkFn $ binopFold (numOp (+)))
   , ("*", mkFn $ binopFold (numOp (*)))
   , ("-", mkFn $ binopFold (numOp (-)))
+  , ("div", mkFn $ binopFold (numOp (div)))
   , ("<", mkFn $ binop (numCmp (<)))
   , (">", mkFn $ binop (numCmp (>)))
   , ("<=", mkFn $ binop (numCmp (<=)))
