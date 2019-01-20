@@ -12,7 +12,7 @@ import qualified Prim as Prim
 -- | Define the default evaluation environment
 basicEnv :: Map.Map String L.LispVal
 basicEnv = Map.fromList $ Prim.primEnv
-  <> [("read", L.Fun . L.IFunc . Prim.unaryOp $ readFn)]
+  <> [("read", L.Fun . L.IFunc . Prim.unop $ readFn)]
 
 -- | Evaluate a Lisp file
 evalFile :: String -> String -> IO ()
