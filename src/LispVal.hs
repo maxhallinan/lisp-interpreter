@@ -55,11 +55,79 @@ showLispVal x =
 
 data LispException 
   = NumArgs Integer [LispVal]
-  | PError String
-  | UnboundVar String
-  | BadSpecialForm String
+  | LengthOfList String Int
+  | ExpectedList String
   | TypeMismatch String LispVal
+  | BadSpecialForm String
   | NotFunction LispVal
-  deriving (Show)
+  | UnboundVar String
+  | UnknownError LispVal
+  | ParseError String
+  | IOError String
 
 instance Exception LispException
+
+instance Show LispException where
+  show = showLispException
+
+unwordsLispVal :: [LispVal] -> String
+unwordsLispVal xs = S.unwords $ show <$> xs
+
+showLispException :: LispException -> String
+showLispException (NumArgs expected args) = 
+  concat 
+    [ "<NumberOfArgumentsError> expected "
+    , show expected
+    , " arguments but received "
+    , unwordsLispVal args
+    ]
+showLispException (LengthOfList fnName expected) = 
+  concat 
+    [ "<LengthOfListError> expected list of length "
+    , show expected
+    , " in function "
+    , fnName
+    ]
+showLispException (ExpectedList fnName) = 
+  concat 
+    [ "<ExpectedListError> expected a list in function "
+    , fnName
+    ]
+showLispException (TypeMismatch expected received)  = 
+  concat 
+    [ "<TypeMismatchError> expected type "
+    , expected
+    , "but received "
+    , show received
+    ]
+showLispException (BadSpecialForm msg) = 
+  concat 
+    [ "<BadSpecialFormError>: "
+    , msg
+    ]
+showLispException (NotFunction received) = 
+  concat 
+    [ "<NotFunctionError> expected a function but found "
+    , show received
+    ]
+showLispException (UnboundVar varName) = 
+  concat 
+    [ "<UnboundVarError> variable "
+    , varName
+    , " not found"
+    ]
+showLispException (UnknownError x) = 
+  concat 
+    [ "<UnknownError> evaluation stopped at "
+    , show x
+    ]
+showLispException (ParseError expression) = 
+  concat 
+    [ "<ParseError> cannot parse expression "
+    , expression
+    ]
+showLispException (IOError filename) = 
+  concat 
+    [ "<IOError> problem reading file "
+    , filename
+    ]

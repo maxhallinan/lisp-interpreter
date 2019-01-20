@@ -24,7 +24,7 @@ evalFile filename file = result >>= print
 fileToAST :: String -> String -> L.Eval L.LispVal
 fileToAST filename file = 
   either 
-    (throw . L.PError . show) 
+    (throw . L.ParseError . show) 
     evalBody 
     (Parser.readSexprFile filename file)
 
