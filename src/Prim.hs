@@ -8,7 +8,7 @@ module Prim
 
 import Control.Exception (throw)
 import Control.Monad (foldM)
-import Data.Foldable (foldl)
+import Data.Foldable (all, foldl)
 import Data.Traversable (traverse)
 import qualified LispVal as L
 
@@ -28,18 +28,17 @@ primEnv =
   , ("==", mkFn $ binop (numCmp (==))) 
   , ("and", mkFn $ binop (bolOp (&&))) 
   , ("or", mkFn $ binop (bolOp (||))) 
-  , ("cons", mkFn $ binop cons) 
-  , ("cdr", mkFn $ unop cdr) 
-  , ("car", mkFn $ unop car) 
-  -- , ("odd?", ) 
-  -- , ("pos?", ) 
-  -- , ("neg?", ) 
-  -- , ("even?", ) 
-  -- , ("eq?", ) 
-  -- , ("bl-eq?", ) 
+  , ("cons", mkFn $ binop consOp) 
+  , ("cdr", mkFn $ unop cdrOp) 
+  , ("car", mkFn $ unop carOp) 
+  , ("odd?", mkFn $ unop oddOp) 
+  , ("even?", mkFn $ unop evenOp) 
+  , ("pos?", mkFn $ unop (numBol (0 <))) 
+  , ("neg?", mkFn $ unop (numBol (0 >))) 
+  , ("++", mkFn $ binop (strOp (++))) 
+  , ("eq?", mkFn $ binop eqOp) 
   -- , ("file?", ) 
   -- , ("slurp?", ) 
-  -- , ("++", ) 
   ]
 
 mkFn :: ([L.LispVal] -> L.Eval L.LispVal) -> L.LispVal
@@ -70,23 +69,48 @@ numCmp op  (L.Int x) (L.Int y) = return $ L.Bol (op x y)
 numCmp _   (L.Int _) y         = throw $ L.TypeMismatch "integer" y
 numCmp _   x         _         = throw $ L.TypeMismatch "integer" x
 
+numBol :: (Integer -> Bool) -> L.LispVal -> L.Eval L.LispVal
+numBol op (L.Int x) = return $ L.Bol (op x)
+numBol _  x         = throw $ L.TypeMismatch "integer" x
+
 bolOp :: (Bool -> Bool -> Bool) -> L.LispVal -> L.LispVal -> L.Eval L.LispVal
 bolOp op  (L.Bol x) (L.Bol y) = return $ L.Bol (op x y)
 bolOp _   (L.Int _) y         = throw $ L.TypeMismatch "boolean" y
 bolOp _   x         _         = throw $ L.TypeMismatch "boolean" x
 
-cons :: L.LispVal -> L.LispVal -> L.Eval L.LispVal
-cons x  (L.List ys) = return $ L.List (x:ys)
-cons x  L.Nil       = return $ L.List [x]
-cons _  x           = throw $ L.ExpectedList "cons" x
+strOp :: (String -> String -> String) -> L.LispVal -> L.LispVal -> L.Eval L.LispVal
+strOp op  (L.Str x) (L.Str y) = return $ L.Str (op x y)
+strOp _   (L.Str _) y         = throw $ L.TypeMismatch "string" y
+strOp _   x         (L.Str _) = throw $ L.TypeMismatch "string" x
 
-car :: L.LispVal -> L.Eval L.LispVal
-car (L.List [])     = throw $ L.LengthOfList "car" 1
-car (L.List (x:_))  = return x
-car x               = throw $ L.ExpectedList "cdr" x
+consOp :: L.LispVal -> L.LispVal -> L.Eval L.LispVal
+consOp x  (L.List ys) = return $ L.List (x:ys)
+consOp x  L.Nil       = return $ L.List [x]
+consOp _  x           = throw $ L.ExpectedList "cons" x
 
-cdr :: L.LispVal -> L.Eval L.LispVal
-cdr (L.List [])       = throw $ L.LengthOfList "cdr" 1
-cdr (L.List [x])      = return L.Nil 
-cdr (L.List (_:xs))   = return $ L.List xs
-cdr x                 = throw $ L.ExpectedList "cdr" x
+carOp :: L.LispVal -> L.Eval L.LispVal
+carOp (L.List [])     = throw $ L.LengthOfList "car" 1
+carOp (L.List (x:_))  = return x
+carOp x               = throw $ L.ExpectedList "cdr" x
+
+cdrOp :: L.LispVal -> L.Eval L.LispVal
+cdrOp (L.List [])       = throw $ L.LengthOfList "cdr" 1
+cdrOp (L.List [x])      = return L.Nil 
+cdrOp (L.List (_:xs))   = return $ L.List xs
+cdrOp x                 = throw $ L.ExpectedList "cdr" x
+
+evenOp :: L.LispVal -> L.Eval L.LispVal
+evenOp (L.Int x)  = return $ L.Bol ((mod x 2) == 0)
+evenOp x          = throw $ L.TypeMismatch "integer" x
+
+oddOp :: L.LispVal -> L.Eval L.LispVal
+oddOp (L.Int x) = return $ L.Bol ((mod x 2) /= 0)
+oddOp x         = throw $ L.TypeMismatch "integer" x
+
+eqOp :: L.LispVal -> L.LispVal -> L.Eval L.LispVal
+eqOp (L.Symbol x) (L.Symbol y)  = return $ L.Bol (x == y)
+eqOp (L.Str x)    (L.Str y)     = return $ L.Bol (x == y)
+eqOp (L.Int x)    (L.Int y)     = return $ L.Bol (x == y)
+eqOp (L.Bol x)    (L.Bol y)     = return $ L.Bol (x == y)
+eqOp L.Nil        L.Nil         = return $ L.Bol True
+eqOp _ _                        = return $ L.Bol False
