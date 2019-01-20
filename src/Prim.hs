@@ -28,15 +28,15 @@ primEnv =
   , ("==", mkFn $ binop (numCmp (==))) 
   , ("and", mkFn $ binop (bolOp (&&))) 
   , ("or", mkFn $ binop (bolOp (||))) 
+  , ("cons", mkFn $ binop cons) 
+  , ("cdr", mkFn $ unop cdr) 
+  , ("car", mkFn $ unop car) 
   -- , ("odd?", ) 
   -- , ("pos?", ) 
   -- , ("neg?", ) 
   -- , ("even?", ) 
   -- , ("eq?", ) 
   -- , ("bl-eq?", ) 
-  -- , ("cons", ) 
-  -- , ("cdr", ) 
-  -- , ("car", ) 
   -- , ("file?", ) 
   -- , ("slurp?", ) 
   -- , ("++", ) 
@@ -74,3 +74,19 @@ bolOp :: (Bool -> Bool -> Bool) -> L.LispVal -> L.LispVal -> L.Eval L.LispVal
 bolOp op  (L.Bol x) (L.Bol y) = return $ L.Bol (op x y)
 bolOp _   (L.Int _) y         = throw $ L.TypeMismatch "boolean" y
 bolOp _   x         _         = throw $ L.TypeMismatch "boolean" x
+
+cons :: L.LispVal -> L.LispVal -> L.Eval L.LispVal
+cons x  (L.List ys) = return $ L.List (x:ys)
+cons x  L.Nil       = return $ L.List [x]
+cons _  x           = throw $ L.ExpectedList "cons" x
+
+car :: L.LispVal -> L.Eval L.LispVal
+car (L.List [])     = throw $ L.LengthOfList "car" 1
+car (L.List (x:_))  = return x
+car x               = throw $ L.ExpectedList "cdr" x
+
+cdr :: L.LispVal -> L.Eval L.LispVal
+cdr (L.List [])       = throw $ L.LengthOfList "cdr" 1
+cdr (L.List [x])      = return L.Nil 
+cdr (L.List (_:xs))   = return $ L.List xs
+cdr x                 = throw $ L.ExpectedList "cdr" x

@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module LispVal 
+module LispVal
   ( EnvCtx
   , Eval(..)
   , IFunc(..)
@@ -14,15 +14,15 @@ import qualified Data.Map as M
 import qualified Data.String as S
 import qualified Data.Typeable as T
 
-data LispVal 
-  = Symbol String 
+data LispVal
+  = Symbol String
   | List [LispVal]
   | Int Integer
   | Str String
   | Fun IFunc
   | Lambda IFunc EnvCtx
   | Nil
-  | Bol Bool 
+  | Bol Bool
   deriving (T.Typeable)
 
 data IFunc = IFunc { fn :: [LispVal] -> Eval LispVal }
@@ -41,7 +41,7 @@ instance Show LispVal where
   show = showLispVal
 
 showLispVal :: LispVal -> String
-showLispVal x = 
+showLispVal x =
   case x of
     (Symbol sym) -> sym
     (Str str) -> concat ["\"", str, "\""]
@@ -53,10 +53,10 @@ showLispVal x =
     (Fun _) -> "<internal function>"
     (Lambda _ _) -> "<lambda function>"
 
-data LispException 
+data LispException
   = NumArgs Integer [LispVal]
   | LengthOfList String Int
-  | ExpectedList String
+  | ExpectedList String LispVal
   | TypeMismatch String LispVal
   | BadSpecialForm String
   | NotFunction LispVal
@@ -74,60 +74,62 @@ unwordsLispVal :: [LispVal] -> String
 unwordsLispVal xs = S.unwords $ show <$> xs
 
 showLispException :: LispException -> String
-showLispException (NumArgs expected args) = 
-  concat 
+showLispException (NumArgs expected args) =
+  concat
     [ "<NumberOfArgumentsError> expected "
     , show expected
     , " arguments but received "
     , unwordsLispVal args
     ]
-showLispException (LengthOfList fnName expected) = 
-  concat 
+showLispException (LengthOfList fnName expected) =
+  concat
     [ "<LengthOfListError> expected list of length "
     , show expected
     , " in function "
     , fnName
     ]
-showLispException (ExpectedList fnName) = 
-  concat 
+showLispException (ExpectedList fnName received) =
+  concat
     [ "<ExpectedListError> expected a list in function "
     , fnName
+    , " but received "
+    , show received
     ]
-showLispException (TypeMismatch expected received)  = 
-  concat 
+showLispException (TypeMismatch expected received)  =
+  concat
     [ "<TypeMismatchError> expected type "
     , expected
     , "but received "
     , show received
     ]
-showLispException (BadSpecialForm msg) = 
-  concat 
+showLispException (BadSpecialForm msg) =
+  concat
     [ "<BadSpecialFormError>: "
     , msg
     ]
-showLispException (NotFunction received) = 
-  concat 
+showLispException (NotFunction received) =
+  concat
     [ "<NotFunctionError> expected a function but found "
     , show received
     ]
-showLispException (UnboundVar varName) = 
-  concat 
+showLispException (UnboundVar varName) =
+  concat
     [ "<UnboundVarError> variable "
     , varName
     , " not found"
     ]
-showLispException (UnknownError x) = 
-  concat 
+showLispException (UnknownError x) =
+  concat
     [ "<UnknownError> evaluation stopped at "
     , show x
     ]
-showLispException (ParseError expression) = 
-  concat 
+showLispException (ParseError expression) =
+  concat
     [ "<ParseError> cannot parse expression "
     , expression
     ]
-showLispException (IOError filename) = 
-  concat 
+showLispException (IOError filename) =
+  concat
     [ "<IOError> problem reading file "
     , filename
     ]
