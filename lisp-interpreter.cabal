@@ -45,6 +45,7 @@ library
     , containers
     , mtl
     , directory
+    , haskeline
   default-language: Haskell2010
 
 executable lisp-interpreter-exe

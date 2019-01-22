@@ -6,8 +6,8 @@ import Control.Monad
 import qualified Parser as Parser
 import qualified Eval as Eval
 import qualified System.IO as Sys
+import Repl as Repl
 
 main :: IO ()
 main = do 
-  args <- Env.getArgs 
-  return ()
+  Repl.run

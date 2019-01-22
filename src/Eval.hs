@@ -1,7 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Eval where
 
-import Control.Exception (throw)
+import Control.Exception (SomeException, fromException, throw, try)
 import Data.Traversable (traverse)
 import qualified Control.Monad.Reader as R
 import qualified Data.Map as Map
@@ -17,16 +18,52 @@ basicEnv = Map.fromList $ Prim.primEnv
 -- | Evaluate a Lisp file
 evalFile :: String -> String -> IO ()
 evalFile filename file = result >>= print
-  where ast     = fileToAST filename file 
-        result  = runASTInEnv basicEnv ast
+  where eval    = fileToEval filename file 
+        result  = runASTInEnv basicEnv eval
+
+evalStr :: String -> IO ()
+evalStr str = evalStrInEnv basicEnv str >> return ()
+
+evalStrInEnv :: L.EnvCtx -> String -> IO L.EnvCtx
+evalStrInEnv env str = result >>= handleResult
+  where eval                    = strToEval str
+        result                  = runASTInEnv env eval
+        handleResult (env', res) = do
+          print res
+          print $ show env'
+          return env'
+
+safeExec :: IO a -> IO (Either String a)
+safeExec m = do
+  result <- try m
+  case result of
+    Left (exception :: SomeException) ->
+      case fromException exception of
+        Just (lispException :: L.LispException) -> 
+          return $ Left (show lispException)
+        Nothing -> 
+          return $ Left (show exception)
+    Right x -> 
+      return $ Right x
 
 -- | Parse a Lisp string into a Lisp AST
-fileToAST :: String -> String -> L.Eval L.LispVal
-fileToAST filename file = 
+fileToEval :: String -> String -> L.Eval L.LispVal
+fileToEval filename file = 
   either 
     (throw . L.ParseError . show) 
     evalBody 
     (Parser.readSexprFile filename file)
+
+strToEval :: String -> L.Eval (L.EnvCtx, L.LispVal)
+strToEval str = 
+  either 
+    (throw . L.ParseError . show) 
+    go
+    (Parser.readSexpr str)
+  where go ast = do
+          r <- evalBody ast
+          env <- R.ask
+          return (env, r)
 
 -- | Test s-expression parser
 runParseTest :: String -> String
