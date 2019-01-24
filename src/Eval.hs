@@ -5,6 +5,7 @@ module Eval where
 import Control.Exception (SomeException, fromException, throw, try)
 import Data.Traversable (traverse)
 import qualified Control.Monad.Reader as R
+import qualified Control.Monad.State as S
 import qualified Data.Map as Map
 import qualified LispVal as L
 import qualified Parser as Parser
@@ -17,21 +18,17 @@ basicEnv = Map.fromList $ Prim.primEnv
 
 -- | Evaluate a Lisp file
 evalFile :: String -> String -> IO ()
-evalFile filename file = result >>= print
+evalFile filename file = result >>= (print . show . fst)
   where eval    = fileToEval filename file 
         result  = runASTInEnv basicEnv eval
 
-evalStr :: String -> IO ()
-evalStr str = evalStrInEnv basicEnv str >> return ()
+evalStr :: String -> IO L.LispVal
+evalStr str = evalStrInEnv basicEnv str >>= (return . fst)
 
-evalStrInEnv :: L.EnvCtx -> String -> IO L.EnvCtx
-evalStrInEnv env str = result >>= handleResult
-  where eval                    = strToEval str
-        result                  = runASTInEnv env eval
-        handleResult (env', res) = do
-          print res
-          print $ show env'
-          return env'
+evalStrInEnv :: L.EnvCtx -> String -> IO (L.LispVal, L.EnvCtx)
+evalStrInEnv env str = result
+  where eval    = strToEval str
+        result  = runASTInEnv env eval
 
 safeExec :: IO a -> IO (Either String a)
 safeExec m = do
@@ -54,24 +51,20 @@ fileToEval filename file =
     evalBody 
     (Parser.readSexprFile filename file)
 
-strToEval :: String -> L.Eval (L.EnvCtx, L.LispVal)
+strToEval :: String -> L.Eval L.LispVal
 strToEval str = 
   either 
     (throw . L.ParseError . show) 
-    go
+    evalBody
     (Parser.readSexpr str)
-  where go ast = do
-          r <- evalBody ast
-          env <- R.ask
-          return (env, r)
 
 -- | Test s-expression parser
 runParseTest :: String -> String
 runParseTest input = either show show $ Parser.readSexpr input
 
 -- | Evaluate a Lisp program in the provided evaluation environment
-runASTInEnv :: L.EnvCtx -> L.Eval a -> IO a
-runASTInEnv env evalM = R.runReaderT (L.unEval evalM) env
+runASTInEnv :: L.EnvCtx -> L.Eval a -> IO (a, L.EnvCtx)
+runASTInEnv env evalM = S.runStateT (L.unEval evalM) env
 
 readFn :: L.LispVal -> L.Eval L.LispVal
 readFn = undefined
@@ -104,7 +97,7 @@ eval (L.List [L.Symbol "if", pred, whenTrue, whenFalse]) = do
 -- evaluate the special form `let`
 eval (L.List [L.Symbol "let", L.List pairs, expr]) = do
   -- get the environment
-  env     <- R.ask
+  env     <- S.get
   -- pairs is a list where even items (0-based indexing) are symbols (variables)
   -- odd items are expresions bound to the variables
   -- collect/validate the variables
@@ -114,7 +107,8 @@ eval (L.List [L.Symbol "let", L.List pairs, expr]) = do
   -- bind evaluated expressions to variables 
   let env' = Map.fromList (zipWith (\a b -> (extractVar a, b)) symbols values) <> env
   -- evaluate the expression with the updated environment
-  R.local (const env') $ evalBody expr
+  S.put env' 
+  evalBody expr
 -- evaluate the special form `begin`
 eval (L.List [L.Symbol "begin", rest]) = evalBody rest
 eval (L.List ((:) (L.Symbol "begin") rest)) = evalBody $ L.List rest
@@ -125,19 +119,17 @@ eval (L.List [L.Symbol "define", var, expr]) = do
   -- evaluate expression to lisp value
   val <- eval expr
   -- get the environment
-  env <- R.ask 
-  -- bind the value to the variable
-  let env' = Map.insert (extractVar sym) val env
-  -- returns the modified environment 
-  R.local (const env') $ return val
+  env <- S.get 
+  S.put $ Map.insert (extractVar sym) val env
+  return val
 -- evaluate the special form `lambda`
 eval (L.List [L.Symbol "lambda", L.List params, expr]) = do
-  env <- R.ask
+  env <- S.get
   return $ L.Lambda (L.IFunc $ applyLambda expr params) env
 eval (L.List (L.Symbol "lambda":_)) = throw $ L.BadSpecialForm "lambda"
 -- evaluate the special form `delay`
 eval (L.List [L.Symbol "delay", expr]) = do
-  env <- R.ask
+  env <- S.get
   return $ L.Lambda (L.IFunc thunk) env
   where thunk (L.Nil : [])  = applyLambda expr [] []
         thunk args          = throw $ L.NumArgs 1 args
@@ -147,7 +139,9 @@ eval (L.List ((:) x xs)) = do
   x   <- traverse eval xs
   case fn of
     (L.Fun (L.IFunc f)) -> f x
-    (L.Lambda (L.IFunc f) env) -> R.local (const env) $ f x
+    (L.Lambda (L.IFunc f) env) -> do
+      S.put env
+      f x
     _ -> throw $ L.NotFunction fn
 
 -- | Takes a function body, a list of parameter symbols, and a list of argument 
@@ -156,27 +150,30 @@ eval (L.List ((:) x xs)) = do
 -- evaluates the function body within that environment.
 applyLambda :: L.LispVal -> [L.LispVal] -> [L.LispVal] -> L.Eval L.LispVal
 applyLambda expr params args = do
-  env <- R.ask
+  env <- S.get
   -- evaluate the argument expressions
   args' <- traverse eval args
   -- bind the evaluated argument values to the parameter names
   -- combine with existing environment
   let env' = Map.fromList (zipWith (\a b -> (extractVar a, b)) params args') <> env
   -- evaluate the function body with updated environment
-  R.local (const env') $ eval expr
+  S.put env' 
+  eval expr
 
 -- | Evaluate a body expression
 evalBody :: L.LispVal -> L.Eval L.LispVal
 evalBody (L.List [L.List ((:) (L.Symbol "define") [L.Symbol var, expr]), rest]) = do
   val <- eval expr
-  env <- R.ask
+  env <- S.get
   let env' = Map.insert var val env
-  R.local (const env') $ eval rest
+  S.put env'
+  eval rest
 evalBody (L.List ((:) (L.List ((:) (L.Symbol "define") [L.Symbol var, expr])) rest)) = do
   val <- eval expr
-  env <- R.ask
+  env <- S.get
   let env' = Map.insert var val env
-  R.local (const env') $ evalBody (L.List rest)
+  S.put env'
+  evalBody (L.List rest)
 evalBody x = eval x
 
 -- | Get the evenly indexed items in a list 
@@ -201,7 +198,7 @@ extractVar (L.Symbol s) = s
 -- | Get the value bound to a variable
 getVar :: L.LispVal -> L.Eval L.LispVal
 getVar (L.Symbol s) = do
-  env <- R.ask
+  env <- S.get
   case Map.lookup s env of
     Just x -> return x
     Nothing -> throw $ L.UnboundVar s

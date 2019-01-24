@@ -10,8 +10,9 @@ module LispVal
 import Control.Exception (Exception)
 import qualified Control.Monad.Except as E
 import qualified Control.Monad.Reader as R
+import qualified Control.Monad.State as S
 import qualified Data.Map as M
-import qualified Data.String as S
+import Data.String (unwords)
 import qualified Data.Typeable as T
 
 data LispVal
@@ -29,12 +30,12 @@ data IFunc = IFunc { fn :: [LispVal] -> Eval LispVal }
 
 type EnvCtx = M.Map String LispVal
 
-newtype Eval a = Eval { unEval :: R.ReaderT EnvCtx IO a }
+newtype Eval a = Eval { unEval :: S.StateT EnvCtx IO a }
   deriving  ( Monad
             , Functor
             , Applicative
-            , R.MonadReader EnvCtx
-            , R.MonadIO
+            , S.MonadState EnvCtx
+            , S.MonadIO
             )
 
 instance Show LispVal where
@@ -49,7 +50,7 @@ showLispVal x =
     (Bol True) -> "true"
     (Bol False) -> "false"
     Nil -> "()"
-    (List xs) -> concat ["(", S.unwords $ showLispVal <$> xs, ")"]
+    (List xs) -> concat ["(", unwords $ showLispVal <$> xs, ")"]
     (Fun _) -> "<internal function>"
     (Lambda _ _) -> "<lambda function>"
 
@@ -71,7 +72,7 @@ instance Show LispException where
   show = showLispException
 
 unwordsLispVal :: [LispVal] -> String
-unwordsLispVal xs = S.unwords $ show <$> xs
+unwordsLispVal xs = unwords $ show <$> xs
 
 showLispException :: LispException -> String
 showLispException (NumArgs expected args) =
