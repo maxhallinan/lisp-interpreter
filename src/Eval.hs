@@ -14,7 +14,11 @@ import qualified Prim as Prim
 -- | Define the default evaluation environment
 basicEnv :: Map.Map String L.LispVal
 basicEnv = Map.fromList $ Prim.primEnv
-  <> [("read", L.Fun . L.IFunc . Prim.unop $ readFn)]
+  <> [ ("read", L.Fun . L.IFunc . Prim.unop $ readFn)
+     , ("parse", L.Fun . L.IFunc . Prim.unop $ parseFn)
+     , ("eval", L.Fun . L.IFunc . Prim.unop $ eval)
+     , ("show", L.Fun . L.IFunc . Prim.unop $ (return . L.Str . show))
+     ]
 
 -- | Evaluate a Lisp file
 evalFile :: String -> String -> IO ()
@@ -66,8 +70,15 @@ runParseTest input = either show show $ Parser.readSexpr input
 runASTInEnv :: L.EnvCtx -> L.Eval a -> IO (a, L.EnvCtx)
 runASTInEnv env evalM = S.runStateT (L.unEval evalM) env
 
+-- | Parse a Lisp string
+parseFn :: L.LispVal -> L.Eval L.LispVal
+parseFn (L.Str s) = either (throw . L.ParseError . show) return $ Parser.readSexpr s
+parseFn x         = throw $ L.TypeMismatch "string" x
+
+-- | Parse and evaluate a Lisp string
 readFn :: L.LispVal -> L.Eval L.LispVal
-readFn = undefined
+readFn (L.Str s)  = either (throw . L.ParseError . show) eval $ Parser.readSexpr s
+readFn x          = throw $ L.TypeMismatch "string" x
 
 -- | Evaluate a Lisp value
 eval :: L.LispVal -> L.Eval L.LispVal

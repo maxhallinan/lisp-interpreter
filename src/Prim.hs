@@ -42,7 +42,7 @@ primEnv =
   , ("++", mkFn $ binop (strOp (++)))
   , ("eq?", mkFn $ binop eqOp)
   , ("file?", mkFn $ unop doesFileExist)
-  , ("slurp?", mkFn $ unop slurpOp)
+  , ("slurp", mkFn $ unop slurpOp)
   ]
 
 mkFn :: ([L.LispVal] -> L.Eval L.LispVal) -> L.LispVal
@@ -134,7 +134,9 @@ readTextFile filename = SysIO.withFile filename SysIO.ReadMode go
   where
     go :: SysIO.Handle -> IO L.LispVal
     go handle = do
-      isFile <- SysIO.hIsEOF handle
+      isFile <- Dir.doesFileExist filename
       if isFile
-      then (SysIO.hGetContents handle) >>= (return . L.Str)
+      -- getting the "hGetContents: illegal operation (delayed read on closed handle)" error
+      -- then (SysIO.hGetContents handle) >>= (return . L.Str)
+      then (readFile filename) >>= (return . L.Str)
       else throw . L.IOError $ concat ["file does not exist: ", filename]
