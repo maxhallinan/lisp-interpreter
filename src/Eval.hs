@@ -107,8 +107,8 @@ eval (L.List [L.Symbol "let", L.List pairs, expr]) = do
   -- bind evaluated expressions to variables 
   let env' = Map.fromList (zipWith (\a b -> (extractVar a, b)) symbols values) <> env
   -- evaluate the expression with the updated environment
-  S.put env' 
-  evalBody expr
+  -- M.liftM (S.withStateT $ const env') (evalBody expr)
+  L.Eval $ S.withStateT (const env') (L.unEval $ evalBody expr)
 -- evaluate the special form `begin`
 eval (L.List [L.Symbol "begin", rest]) = evalBody rest
 eval (L.List ((:) (L.Symbol "begin") rest)) = evalBody $ L.List rest
@@ -179,7 +179,7 @@ evalBody x = eval x
 -- | Get the evenly indexed items in a list 
 getEven :: [a] -> [a]
 getEven [] = []
-getEven (x:xs) = x : getEven xs
+getEven (x:xs) = x : getOdd xs
 
 -- | Get the oddly indexed items in a list
 getOdd :: [a] -> [a]

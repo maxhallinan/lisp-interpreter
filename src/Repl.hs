@@ -19,11 +19,11 @@ loop env = do
       Just "" -> loop env
       Just ":quit" -> H.outputStrLn "Goodbye"
       Just input -> do
-        eResult <- liftIO $ E.safeExec (E.evalStrInEnv env input)
-        case eResult of
-          Left errMsg -> do
-            H.outputStrLn errMsg
-            loop env
-          Right (result, env') -> do
-            H.outputStrLn $ show result
-            loop env'
+        result <- liftIO $ E.safeExec (E.evalStrInEnv env input)
+        either onError onResult result
+  where onError errMsg = do
+          H.outputStrLn errMsg
+          loop env
+        onResult (result, env') = do
+          H.outputStrLn $ show result
+          loop env'
