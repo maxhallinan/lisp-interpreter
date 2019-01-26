@@ -20,7 +20,12 @@ run = hspec $ describe "src/Parser.hs" $ do
       it "parses a signed integer" $
         P.readSexpr "-1" `shouldBe` (Right $ L.Int $ negate 1)
 
-    -- describe "list" $ do
+    describe "list" $ do
+      it "parses an unquoted list" $ do
+        P.readSexpr "(foo \"a\" 1)" `shouldBe` (Right $ L.List [L.Symbol "foo", L.Str "a", L.Int 1])
+
+      it "parses a quoted list" $
+        P.readSexpr "'(a b c)" `shouldBe` (Right $ L.List [L.Symbol "quote", L.List [L.Symbol "a", L.Symbol "b", L.Symbol "c"]])
 
     describe "nil" $ do
       it "parses the nil value" $
