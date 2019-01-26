@@ -2,14 +2,23 @@ module Repl (run) where
 
 import qualified LispVal as L
 import qualified Eval as E
+import qualified Prim as Prim
 import qualified System.Console.Haskeline as H
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State as S
 
+stdlibPath = "lisp/stdlib.lisp"
+
 run :: IO ()
 run = do
-  putStrLn "Welcome."
-  H.runInputT H.defaultSettings (loop E.basicEnv)
+  stdlibFile <- readFile stdlibPath
+  result <- liftIO $ E.safeExec (E.evalFileInEnv E.basicEnv stdlibPath stdlibFile)
+  case result of
+    Left errMsg ->
+      putStrLn errMsg
+    Right (_, env') -> do
+      putStrLn "Welcome."
+      H.runInputT H.defaultSettings (loop env')
 
 loop :: L.EnvCtx -> H.InputT IO ()
 loop env = do

@@ -23,8 +23,12 @@ basicEnv = Map.fromList $ Prim.primEnv
 -- | Evaluate a Lisp file
 evalFile :: String -> String -> IO ()
 evalFile filename file = result >>= (print . show . fst)
-  where eval    = fileToEval filename file 
-        result  = runASTInEnv basicEnv eval
+  where result  = evalFileInEnv basicEnv filename file
+
+evalFileInEnv :: L.EnvCtx -> String -> String -> IO (L.LispVal, L.EnvCtx)
+evalFileInEnv env filename file = result
+  where eval    = fileToEval filename file
+        result  = runASTInEnv env eval
 
 evalStr :: String -> IO L.LispVal
 evalStr str = evalStrInEnv basicEnv str >>= (return . fst)
@@ -40,25 +44,25 @@ safeExec m = do
   case result of
     Left (exception :: SomeException) ->
       case fromException exception of
-        Just (lispException :: L.LispException) -> 
+        Just (lispException :: L.LispException) ->
           return $ Left (show lispException)
-        Nothing -> 
+        Nothing ->
           return $ Left (show exception)
-    Right x -> 
+    Right x ->
       return $ Right x
 
 -- | Parse a Lisp string into a Lisp AST
 fileToEval :: String -> String -> L.Eval L.LispVal
-fileToEval filename file = 
-  either 
-    (throw . L.ParseError . show) 
-    evalBody 
+fileToEval filename file =
+  either
+    (throw . L.ParseError . show)
+    evalBody
     (Parser.readSexprFile filename file)
 
 strToEval :: String -> L.Eval L.LispVal
-strToEval str = 
-  either 
-    (throw . L.ParseError . show) 
+strToEval str =
+  either
+    (throw . L.ParseError . show)
     evalBody
     (Parser.readSexpr str)
 
@@ -77,7 +81,7 @@ parseFn x         = throw $ L.TypeMismatch "string" x
 
 -- | Parse and evaluate a Lisp string
 readFn :: L.LispVal -> L.Eval L.LispVal
-readFn (L.Str s)  = either (throw . L.ParseError . show) eval $ Parser.readSexpr s
+readFn (L.Str s)  = either (throw . L.ParseError . show) eval $ Parser.readSexprFile "<stdin>" s
 readFn x          = throw $ L.TypeMismatch "string" x
 
 -- | Evaluate a Lisp value
@@ -92,19 +96,19 @@ eval (L.Bol x)    = return $ L.Bol x
 eval (L.List [])  = return $ L.Nil
 eval L.Nil        = return $ L.Nil
 -- stringify a Lisp value
-eval (L.List [L.Symbol "write", rest]) = 
+eval (L.List [L.Symbol "write", rest]) =
   return . L.Str . show $ rest
-eval (L.List ((:) (L.Symbol "write") rest)) = 
+eval (L.List ((:) (L.Symbol "write") rest)) =
   return . L.Str . show $ L.List rest
 -- return the value bound to the variable
 eval s@(L.Symbol _) = getVar s
 -- evaluate the special form `if`
 eval (L.List [L.Symbol "if", pred, whenTrue, whenFalse]) = do
-  condition <- eval pred 
+  condition <- eval pred
   case condition of
     (L.Bol True) -> eval whenTrue
     (L.Bol False) -> eval whenFalse
-    _ -> throw $ L.BadSpecialForm "if" 
+    _ -> throw $ L.BadSpecialForm "if"
 -- evaluate the special form `let`
 eval (L.List [L.Symbol "let", L.List pairs, expr]) = do
   -- get the environment
@@ -115,7 +119,7 @@ eval (L.List [L.Symbol "let", L.List pairs, expr]) = do
   symbols <- traverse validateSymbol $ getEven pairs
   -- collect/evaluate the expressions
   values  <- traverse eval $ getOdd pairs
-  -- bind evaluated expressions to variables 
+  -- bind evaluated expressions to variables
   let env' = Map.fromList (zipWith (\a b -> (extractVar a, b)) symbols values) <> env
   -- evaluate the expression with the updated environment
   -- M.liftM (S.withStateT $ const env') (evalBody expr)
@@ -130,7 +134,7 @@ eval (L.List [L.Symbol "define", var, expr]) = do
   -- evaluate expression to lisp value
   val <- eval expr
   -- get the environment
-  env <- S.get 
+  env <- S.get
   S.put $ Map.insert (extractVar sym) val env
   return val
 -- evaluate the special form `lambda`
@@ -149,16 +153,15 @@ eval (L.List [L.Symbol "car", L.List [L.Symbol "quote", L.List (x:_)]]) =
 eval (L.List [L.Symbol "car", arg@(L.List (x:_))]) =
   case x of
     L.Symbol _  -> do val <- eval arg
-                      eval $ L.List [L.Symbol "car", val] 
+                      eval $ L.List [L.Symbol "car", val]
     _           -> return $ x
-eval (L.List [L.Symbol "cdr", L.List [L.Symbol "quote", L.List (_:xs)]]) = 
+eval (L.List [L.Symbol "cdr", L.List [L.Symbol "quote", L.List (_:xs)]]) =
   return $ L.List xs
 eval (L.List [L.Symbol "cdr", arg@(L.List (x:xs))]) = do
   case x of
     L.Symbol _  -> do val <- eval arg
                       eval $ L.List [L.Symbol "cdr", val]
     _           -> return $ L.List xs
-
 -- evaluate function application
 eval (L.List ((:) x xs)) = do
   fn  <- eval x
@@ -170,9 +173,9 @@ eval (L.List ((:) x xs)) = do
       f x
     _ -> throw $ L.NotFunction fn
 
--- | Takes a function body, a list of parameter symbols, and a list of argument 
+-- | Takes a function body, a list of parameter symbols, and a list of argument
 -- expressions.
--- Evaluates the arguments, binds the argument values to the parameters, and 
+-- Evaluates the arguments, binds the argument values to the parameters, and
 -- evaluates the function body within that environment.
 applyLambda :: L.LispVal -> [L.LispVal] -> [L.LispVal] -> L.Eval L.LispVal
 applyLambda expr params args = do
@@ -183,7 +186,7 @@ applyLambda expr params args = do
   -- combine with existing environment
   let env' = Map.fromList (zipWith (\a b -> (extractVar a, b)) params args') <> env
   -- evaluate the function body with updated environment
-  S.put env' 
+  S.put env'
   eval expr
 
 -- | Evaluate a body expression
@@ -202,7 +205,7 @@ evalBody (L.List ((:) (L.List ((:) (L.Symbol "define") [L.Symbol var, expr])) re
   evalBody (L.List rest)
 evalBody x = eval x
 
--- | Get the evenly indexed items in a list 
+-- | Get the evenly indexed items in a list
 getEven :: [a] -> [a]
 getEven [] = []
 getEven (x:xs) = x : getOdd xs
