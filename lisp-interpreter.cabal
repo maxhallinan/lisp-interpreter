@@ -60,19 +60,16 @@ executable lisp-interpreter-exe
     , lisp-interpreter
   default-language: Haskell2010
 
-test-suite lisp-interpreter-test
+test-suite test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      ParserSpec
       Paths_lisp_interpreter
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      QuickCheck
-    , base >=4.7 && <5
-    , hspec
+      base >=4.7 && <5
     , lisp-interpreter
-    , megaparsec
+    , hspec
   default-language: Haskell2010

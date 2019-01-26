@@ -1,5 +1,7 @@
+module Main (main) where
+
 import qualified ParserSpec as ParserSpec
 
 main :: IO ()
 main = do
-  ParserSpec.main
+  ParserSpec.run

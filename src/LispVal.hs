@@ -24,9 +24,12 @@ data LispVal
   | Lambda IFunc EnvCtx
   | Nil
   | Bol Bool
-  deriving (T.Typeable)
+  deriving (Eq, T.Typeable)
 
 data IFunc = IFunc { fn :: [LispVal] -> Eval LispVal }
+
+instance Eq IFunc where
+  (==) _ _ = False
 
 type EnvCtx = M.Map String LispVal
 

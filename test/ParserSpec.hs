@@ -1,77 +1,38 @@
-module ParserSpec (main) where
+module ParserSpec (run) where
 
 import Test.Hspec (describe, hspec, it, shouldBe)
-import Test.QuickCheck
-import qualified Parser
+import qualified Parser as P
+import qualified LispVal as L
 
-parse = Parser.parse "fake-filename"
+run :: IO ()
+run = hspec $ describe "src/Parser.hs" $ do
+  describe "readSexpr" $ do
 
-main :: IO ()
-main = hspec $ do
-  describe "parse" $ do
-    describe "comment" $ do
-      it "ignores a comment" $ do
-        parse "#t;foo" `shouldBe` Right (Parser.Bool True)
-        
     describe "boolean" $ do
-      it "parses a boolean" $ do
-        parse "#t" `shouldBe` Right (Parser.Bool True)
-        parse "#f" `shouldBe` Right (Parser.Bool False)
+      it "parses true" $
+        P.readSexpr "true" `shouldBe` (Right $ L.Bol True)
+      it "parses false" $
+        P.readSexpr "false" `shouldBe` (Right $ L.Bol False)
 
-    describe "number" $ do
-      it "parses a number" $ do
-        parse "1" `shouldBe` Right (Parser.Number 1)
-        parse "123" `shouldBe` Right (Parser.Number 123)
+    describe "integer" $ do
+      it "parses an unsigned integer" $
+        P.readSexpr "1" `shouldBe` (Right $ L.Int 1)
+      it "parses a signed integer" $
+        P.readSexpr "-1" `shouldBe` (Right $ L.Int $ negate 1)
+
+    -- describe "list" $ do
+
+    describe "nil" $ do
+      it "parses the nil value" $
+        P.readSexpr "()" `shouldBe` (Right $ L.Nil)
+
+    -- describe "s-expression" $ do
+    -- describe "function" $ do
 
     describe "string" $ do
-      it "parses a string" $ do
-        parse "\"a\"" `shouldBe` Right (Parser.String "a")
-        parse "\"abc\"" `shouldBe` Right (Parser.String "abc")
-        parse "\"1abc\"" `shouldBe` Right (Parser.String "1abc")
-        parse "\"ab1c\"" `shouldBe` Right (Parser.String "ab1c")
+      it "parses a string" $
+        P.readSexpr "\"a\"" `shouldBe` (Right $ L.Str "a")
 
-      describe "escaped characters" $ do
-        it "parses a string with escaped quotes" $ do
-          parse "\"a\\\"b\\\"c\"" `shouldBe` Right (Parser.String "a\"b\"c")
-
-        it "parses a string with an escape character" $ do
-          parse "\"a\\\\b\"" `shouldBe` Right (Parser.String "a\\b")
-
-        it "parses a string with a newline character" $ do
-          parse "\"a\nb\"" `shouldBe` Right (Parser.String "a\nb")
-
-        it "parses a string with a return character" $ do
-          parse "\"a\rb\"" `shouldBe` Right (Parser.String "a\rb")
-
-        it "parses a string with a tab character" $ do
-          parse "\"a\rb\"" `shouldBe` Right (Parser.String "a\rb")
-
-    describe "atom" $ do
-      it "parses an atom" $ do
-        parse "a" `shouldBe` Right (Parser.Atom "a")
-        parse "abc" `shouldBe` Right (Parser.Atom "abc")
-
-      it "parses an atom ending with a special character" $ do
-        parse "a?" `shouldBe` Right (Parser.Atom "a?")
-
-      it "does not parse a parens at the end of an atom" $ do
-        parse "(a)" `shouldBe` Right (Parser.ProperList [Parser.Atom "a"])
-
-    describe "list" $ do
-      describe "proper list" $ do
-        it "parses with spaces" $ do
-          parse "( a 1 )" `shouldBe` Right (Parser.ProperList [Parser.Atom "a", Parser.Number 1])
-
-        it "parses without spaces" $ do
-          parse "(a 1)" `shouldBe` Right (Parser.ProperList [Parser.Atom "a", Parser.Number 1])
-
-      describe "improper list" $ do
-        it "parses with spaces" $ do
-          parse "( a . 1 )" `shouldBe` Right (Parser.ImproperList [Parser.Atom "a"] (Parser.Number 1))
-
-        it "parses without spaces" $ do
-          parse "(a . 1)" `shouldBe` Right (Parser.ImproperList [Parser.Atom "a"] (Parser.Number 1))
-
-      describe "nested list" $ do
-        it "parses a nested list" $ do
-          parse "(\"abc\" (a . 1))" `shouldBe` Right (Parser.ProperList [Parser.String "abc", Parser.ImproperList [Parser.Atom "a"] (Parser.Number 1)])
+    describe "symbol" $ do
+      it "parses a symbol" $
+        P.readSexpr "a" `shouldBe` (Right $ L.Symbol "a")
