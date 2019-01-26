@@ -144,6 +144,21 @@ eval (L.List [L.Symbol "delay", expr]) = do
   return $ L.Lambda (L.IFunc thunk) env
   where thunk (L.Nil : [])  = applyLambda expr [] []
         thunk args          = throw $ L.NumArgs 1 args
+eval (L.List [L.Symbol "car", L.List [L.Symbol "quote", L.List (x:_)]]) =
+  return $ x
+eval (L.List [L.Symbol "car", arg@(L.List (x:_))]) =
+  case x of
+    L.Symbol _  -> do val <- eval arg
+                      eval $ L.List [L.Symbol "car", val] 
+    _           -> return $ x
+eval (L.List [L.Symbol "cdr", L.List [L.Symbol "quote", L.List (_:xs)]]) = 
+  return $ L.List xs
+eval (L.List [L.Symbol "cdr", arg@(L.List (x:xs))]) = do
+  case x of
+    L.Symbol _  -> do val <- eval arg
+                      eval $ L.List [L.Symbol "cdr", val]
+    _           -> return $ L.List xs
+
 -- evaluate function application
 eval (L.List ((:) x xs)) = do
   fn  <- eval x
