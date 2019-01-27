@@ -2,7 +2,7 @@
 
 ## Syntax
 
-```racket
+```lisp
 ; line comment
 #| block comment |#
 true                ; bool
