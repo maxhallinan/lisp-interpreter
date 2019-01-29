@@ -1,0 +1,2 @@
+(cond 
+  ((quote ()) (quote x)))

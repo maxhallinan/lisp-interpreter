@@ -28,7 +28,6 @@ library
   exposed-modules:
       Cli
       Eval
-      Lib
       LispVal
       Parser
       Prim
